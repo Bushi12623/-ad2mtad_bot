@@ -1,0 +1,77 @@
+from aiogram import Bot, Dispatcher, types
+from aiogram.utils import executor
+import requests
+import os
+
+# Токен вашего бота
+API_TOKEN = os.getenv('API_TOKEN', '7659700634:AAFtANhu0ZzkxF8AFxGEkj2Z3BERJJaP-jk')
+
+# API-ключ адмитад
+ADMITAD_API_KEY = os.getenv('ADMITAD_API_KEY', 'D0Rdl5KleAzUvS5F4OLgalmrt2o1mc')
+
+# Инициализация бота
+bot = Bot(token=API_TOKEN)
+dp = Dispatcher(bot)
+
+# Обработчик команды /start
+@dp.message_handler(commands=['start'])
+async def send_welcome(message: types.Message):
+    await message.answer(
+        "Привет! 👋 Я — ваш помощник по выгодным покупкам на AliExpress. 🛍️\n\n"
+        "Я здесь, чтобы помочь вам находить лучшие товары по отличным ценам.\n\n"
+        "🔍 Чтобы начать поиск, просто введите название товара, например:\n"
+        "- Чехол для телефона\n"
+        "- Беспроводные наушники\n"
+        "- Платье летнее\n\n"
+        "Я покажу вам подборку товаров, а вы сможете перейти по ссылке и купить их на AliExpress. 🛒"
+    )
+
+# Обработчик поиска товаров
+@dp.message_handler()
+async def search_products_handler(message: types.Message):
+    query = message.text
+    products = search_products(query)
+    if products:
+        for product in products:
+            name = product['name']
+            price = product['price']
+            image_url = product['image_url']
+            affiliate_link = product['affiliate_link']
+            description = product.get('description', 'Отличный товар по выгодной цене!')
+
+            # Формируем сообщение с товаром
+            caption = (
+                "🎉 <b>Найден товар по вашему запросу!</b>\n\n"
+                f"🔹 <b>Название товара:</b> {name}\n"
+                f"🔹 <b>Цена:</b> {price} ₽\n"
+                f"🔹 <b>Описание:</b> {description}\n\n"
+                f"<a href='{affiliate_link}'>🛒 Купить на AliExpress</a>"
+            )
+
+            # Отправляем товар пользователю
+            await message.answer_photo(
+                photo=image_url,
+                caption=caption,
+                parse_mode="HTML"
+            )
+    else:
+        await message.answer("😔 Товары не найдены. Попробуйте другой запрос, например: 'чехол для телефона'.")
+
+# Функция для поиска товаров через API адмитад
+def search_products(query):
+    url = "https://api.admitad.com/products/search/"
+    headers = {
+        "Authorization": f"Bearer {ADMITAD_API_KEY}"
+    }
+    params = {
+        "q": query,  # Поисковый запрос
+        "limit": 10  # Количество товаров в результатах
+    }
+    response = requests.get(url, headers=headers, params=params)
+    if response.status_code == 200:
+        return response.json()['results']
+    return None
+
+# Запуск бота
+if __name__ == '__main__':
+    executor.start_polling(dp, skip_updates=True)
